@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">Github Finder</string>
+    <string name="url_view">https://github.com/%1$s</string>
+    <string name="search_text">Search</string>
+    <string name="search_view_hint">Search github username…</string>
 </resources>
