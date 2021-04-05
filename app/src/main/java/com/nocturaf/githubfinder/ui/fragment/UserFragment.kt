@@ -13,7 +13,9 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.nocturaf.githubfinder.R
+import com.nocturaf.githubfinder.network.api.ApiConstant.MAX_PAGE
 import com.nocturaf.githubfinder.network.repository.UsersRepository
 import com.nocturaf.githubfinder.network.util.Result.Success
 import com.nocturaf.githubfinder.network.util.Result.Fail
@@ -42,6 +44,9 @@ class UserFragment : Fragment(LAYOUT) {
 
     private lateinit var usersViewModel: UsersViewModel
     private var usersAdapter: UsersAdapter? = null
+    private var isOnSearchMode: Boolean = false
+    private var currentPage = 1
+    private var searchKeyword = ""
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -69,9 +74,12 @@ class UserFragment : Fragment(LAYOUT) {
             searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
                 // set search view listener
                 override fun onQueryTextSubmit(query: String?): Boolean {
+                    isOnSearchMode = true
                     query?.let { username ->
                         // search users
-                        searchUsers(username)
+                        searchKeyword = username
+                        usersViewModel.searchUsersList.clear()
+                        searchUsers(searchKeyword)
                     }
                     searchView.clearFocus()
                     return true
@@ -88,8 +96,8 @@ class UserFragment : Fragment(LAYOUT) {
         // init usersViewModel using view model provider factory
         UsersViewModelProviderFactory(UsersRepository()).apply {
             usersViewModel = ViewModelProvider(
-                this@UserFragment,
-                this
+                    this@UserFragment,
+                    this
             ).get(UsersViewModel::class.java)
         }
     }
@@ -101,19 +109,29 @@ class UserFragment : Fragment(LAYOUT) {
             setHasFixedSize(true)
             adapter = usersAdapter
             layoutManager = LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    if (isOnSearchMode && !canScrollVertically(1)) {
+                        // do pagination
+                        currentPage++
+                        if (currentPage <= MAX_PAGE) {
+                            showLoadMore()
+                            searchUsers(searchKeyword, currentPage)
+                        }
+                    }
+                }
+            })
         }
     }
 
     private fun loadUsersData() {
         // load initial users data
-        showLoader()
         usersViewModel.getUsers()
     }
 
-    private fun searchUsers(username: String) {
+    private fun searchUsers(username: String, page: Int = 1) {
         // search github user by username
-        showLoader()
-        usersViewModel.searchUsers(username)
+        usersViewModel.searchUsers(username, page)
     }
 
     private fun showLoader() {
@@ -124,6 +142,14 @@ class UserFragment : Fragment(LAYOUT) {
     private fun hideLoader() {
         loader?.gone()
         rvUser?.visible()
+    }
+
+    private fun showLoadMore() {
+        loader_footer?.visible()
+    }
+
+    private fun hideLoadMore() {
+        loader_footer?.gone()
     }
 
     private fun observeLiveData() {
@@ -151,7 +177,11 @@ class UserFragment : Fragment(LAYOUT) {
         usersViewModel.searchUsers.observe(viewLifecycleOwner, Observer { searchUsersResponse ->
             when (searchUsersResponse) {
                 is Success -> {
-                    hideLoader()
+                    if (currentPage == 1) {
+                        hideLoader()
+                    } else {
+                        hideLoadMore()
+                    }
                     val searchUsersList = searchUsersResponse.data
                     searchUsersList?.let { list ->
                         usersAdapter?.differ?.submitList(list)
@@ -159,11 +189,18 @@ class UserFragment : Fragment(LAYOUT) {
                 }
                 is Fail -> {
                     hideLoader()
+                    hideLoadMore()
                     searchUsersResponse.message?.let {
                         Log.d(TAG, it)
                     }
                 }
-                is Loading -> showLoader()
+                is Loading -> {
+                    if (currentPage == 1) {
+                        showLoader()
+                    } else {
+                        showLoadMore()
+                    }
+                }
             }
         })
     }
