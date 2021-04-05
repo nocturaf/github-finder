@@ -67,12 +67,15 @@ class UserFragment : Fragment(LAYOUT) {
         inflater.inflate(TOOLBAR_MENU, menu)
         val searchIcon = menu.findItem(SEARCH_MENU_ID)
         activity?.let {
+
             val searchManager = it.getSystemService(Context.SEARCH_SERVICE) as SearchManager
             val searchView = searchIcon.actionView as SearchView
+
             searchView.setSearchableInfo(searchManager.getSearchableInfo(it.componentName))
             searchView.queryHint = getString(R.string.search_view_hint)
+
+            // set listener when search view perform searching
             searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                // set search view listener
                 override fun onQueryTextSubmit(query: String?): Boolean {
                     isOnSearchMode = true
                     query?.let { username ->
@@ -89,6 +92,16 @@ class UserFragment : Fragment(LAYOUT) {
                     return true
                 }
             })
+
+            // set listener when search view on close
+            searchView.setOnCloseListener {
+                // reset state
+                searchView.clearFocus()
+                isOnSearchMode = false
+                currentPage = 1
+                loadUsersData()
+                false
+            }
         }
     }
 
