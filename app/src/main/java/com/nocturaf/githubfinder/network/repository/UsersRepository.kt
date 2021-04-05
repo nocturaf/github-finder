@@ -1,5 +1,6 @@
 package com.nocturaf.githubfinder.network.repository
 
+import com.nocturaf.githubfinder.network.api.ApiConstant
 import com.nocturaf.githubfinder.network.api.NetworkClient
 import com.nocturaf.githubfinder.network.api.UsersApi
 import com.nocturaf.githubfinder.network.model.SearchUsersResponse
@@ -16,7 +17,7 @@ class UsersRepository {
         return usersApi.getAllUsers()
     }
 
-    suspend fun searchUsers(username: String): Response<SearchUsersResponse> {
-        return usersApi.searchUsers(username)
+    suspend fun searchUsers(username: String, page: Int = 1): Response<SearchUsersResponse> {
+        return usersApi.searchUsers(username, page)
     }
 }

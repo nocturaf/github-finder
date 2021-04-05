@@ -23,15 +23,17 @@ class UsersViewModel(
     private val _searchUsers: MutableLiveData<Result<List<UserUiModel>>> = MutableLiveData()
     val searchUsers: LiveData<Result<List<UserUiModel>>> get() = _searchUsers
 
+    var searchUsersList: MutableList<UserUiModel> = mutableListOf()
+
     fun getUsers() = viewModelScope.launch {
         _users.postValue(Result.Loading())
-        val response = getUsersCall(usersRepository.getUsers())
+        val response= getUsersCall(usersRepository.getUsers())
         _users.postValue(response)
     }
 
-    fun searchUsers(username: String) = viewModelScope.launch {
+    fun searchUsers(username: String, page: Int = 1) = viewModelScope.launch {
         _searchUsers.postValue(Result.Loading())
-        val searchUsersResponse = searchUsersCall(usersRepository.searchUsers(username))
+        val searchUsersResponse = searchUsersCall(usersRepository.searchUsers(username, page))
         _searchUsers.postValue(searchUsersResponse)
     }
 
@@ -49,10 +51,13 @@ class UsersViewModel(
     private fun searchUsersCall(response: Response<SearchUsersResponse>): Result<List<UserUiModel>> {
         if (response.isSuccessful) {
             response.body()?.let { responseBody ->
-                val searchUsersList = responseBody.items
-                return Result.Success(
-                    UserMapper.mapToUserUiModel(searchUsersList)
-                )
+                val responseUsersList = UserMapper.mapToUserUiModel(responseBody.items)
+                if (searchUsersList.isEmpty()) {
+                    searchUsersList = responseUsersList.toMutableList()
+                } else {
+                    searchUsersList.addAll(responseUsersList)
+                }
+                return Result.Success(searchUsersList.toList())
             }
         }
         return Result.Fail(response.message())
