@@ -12,6 +12,7 @@ import com.nocturaf.githubfinder.ui.model.UserUiModel
 import com.nocturaf.githubfinder.util.UserMapper
 import kotlinx.coroutines.launch
 import retrofit2.Response
+import java.lang.Exception
 
 class UsersViewModel(
     private val usersRepository: UsersRepository
@@ -27,14 +28,22 @@ class UsersViewModel(
 
     fun getUsers() = viewModelScope.launch {
         _users.postValue(Result.Loading())
-        val response= getUsersCall(usersRepository.getUsers())
-        _users.postValue(response)
+        try {
+            val response = getUsersCall(usersRepository.getUsers())
+            _users.postValue(response)
+        } catch (e: Exception) {
+            _users.postValue(Result.Fail(e.message))
+        }
     }
 
     fun searchUsers(username: String, page: Int = 1) = viewModelScope.launch {
         _searchUsers.postValue(Result.Loading())
-        val searchUsersResponse = searchUsersCall(usersRepository.searchUsers(username, page))
-        _searchUsers.postValue(searchUsersResponse)
+        try {
+            val searchUsersResponse = searchUsersCall(usersRepository.searchUsers(username, page))
+            _searchUsers.postValue(searchUsersResponse)
+        } catch (e: Exception) {
+            _searchUsers.postValue(Result.Fail(e.message))
+        }
     }
 
     private fun getUsersCall(response: Response<List<User>>): Result<List<UserUiModel>> {

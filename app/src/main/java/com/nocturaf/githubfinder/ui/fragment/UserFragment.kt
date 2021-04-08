@@ -2,6 +2,7 @@ package com.nocturaf.githubfinder.ui.fragment
 
 import android.app.SearchManager
 import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Bundle
 import android.util.Log
 import android.view.*
@@ -25,7 +26,9 @@ import com.nocturaf.githubfinder.ui.viewmodel.UsersViewModel
 import com.nocturaf.githubfinder.ui.viewmodel.UsersViewModelProviderFactory
 import com.nocturaf.githubfinder.util.gone
 import com.nocturaf.githubfinder.util.visible
+import kotlinx.android.synthetic.main.error_network_view.*
 import kotlinx.android.synthetic.main.fragment_user.*
+import kotlinx.android.synthetic.main.no_internet_view.*
 
 class UserFragment : Fragment(LAYOUT) {
 
@@ -78,6 +81,7 @@ class UserFragment : Fragment(LAYOUT) {
             searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
                 override fun onQueryTextSubmit(query: String?): Boolean {
                     isOnSearchMode = true
+                    currentPage = 1
                     query?.let { username ->
                         // search users
                         searchKeyword = username
@@ -97,8 +101,8 @@ class UserFragment : Fragment(LAYOUT) {
             searchView.setOnCloseListener {
                 // reset state
                 searchView.clearFocus()
-                isOnSearchMode = false
                 currentPage = 1
+                isOnSearchMode = false
                 loadUsersData()
                 false
             }
@@ -109,8 +113,8 @@ class UserFragment : Fragment(LAYOUT) {
         // init usersViewModel using view model provider factory
         UsersViewModelProviderFactory(UsersRepository()).apply {
             usersViewModel = ViewModelProvider(
-                    this@UserFragment,
-                    this
+                this@UserFragment,
+                this
             ).get(UsersViewModel::class.java)
         }
     }
@@ -139,17 +143,72 @@ class UserFragment : Fragment(LAYOUT) {
 
     private fun loadUsersData() {
         // load initial users data
-        usersViewModel.getUsers()
+        if (isHasInternetConnection()) {
+            usersViewModel.getUsers()
+        } else {
+            showNoInternetView()
+        }
     }
 
     private fun searchUsers(username: String, page: Int = 1) {
         // search github user by username
-        usersViewModel.searchUsers(username, page)
+        if (isHasInternetConnection()) {
+            usersViewModel.searchUsers(username, page)
+        } else {
+            showNoInternetView()
+        }
+    }
+
+    private fun showErrorNetworkView() {
+        rvUser?.gone()
+        loader?.gone()
+        loader_footer?.gone()
+        errorNetworkView?.visible()
+        btnTryAgainErrorNetwork?.setOnClickListener {
+            if (isOnSearchMode) {
+                currentPage = 1
+                usersViewModel.searchUsersList.clear()
+                searchUsers(searchKeyword)
+            } else {
+                loadUsersData()
+            }
+        }
+    }
+
+    private fun hideErrorNetworkView() {
+        errorNetworkView?.gone()
+    }
+
+    private fun showNoInternetView() {
+        rvUser?.gone()
+        loader?.gone()
+        loader_footer?.gone()
+        noInternetView?.visible()
+        btnTryAgain?.setOnClickListener {
+            loadUsersData()
+        }
+    }
+
+    private fun hideNoInternetView() {
+        noInternetView?.gone()
+    }
+
+    private fun showEmptyView() {
+        rvUser?.gone()
+        loader?.gone()
+        emptyView?.visible()
+    }
+
+    private fun hideEmptyView() {
+        emptyView?.gone()
     }
 
     private fun showLoader() {
         loader?.visible()
         rvUser?.gone()
+        hideNoInternetView()
+        hideErrorNetworkView()
+        hideEmptyView()
     }
 
     private fun hideLoader() {
@@ -165,6 +224,12 @@ class UserFragment : Fragment(LAYOUT) {
         loader_footer?.gone()
     }
 
+    private fun isHasInternetConnection(): Boolean {
+        val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = cm.activeNetworkInfo
+        return activeNetwork?.isConnectedOrConnecting == true
+    }
+
     private fun observeLiveData() {
         // observe get users live data
         usersViewModel.users.observe(viewLifecycleOwner, Observer { usersResponse ->
@@ -173,11 +238,16 @@ class UserFragment : Fragment(LAYOUT) {
                     hideLoader()
                     val userList = usersResponse.data
                     userList?.let { list ->
-                        usersAdapter?.differ?.submitList(list)
+                        if (list.isEmpty()) {
+                            showEmptyView()
+                        } else {
+                            usersAdapter?.differ?.submitList(list)
+                        }
                     }
                 }
                 is Fail -> {
                     hideLoader()
+                    showErrorNetworkView()
                     usersResponse.message?.let {
                         Log.d(TAG, it)
                     }
@@ -197,12 +267,17 @@ class UserFragment : Fragment(LAYOUT) {
                     }
                     val searchUsersList = searchUsersResponse.data
                     searchUsersList?.let { list ->
-                        usersAdapter?.differ?.submitList(list)
+                        if (list.isEmpty()) {
+                            showEmptyView()
+                        } else {
+                            usersAdapter?.differ?.submitList(list)
+                        }
                     }
                 }
                 is Fail -> {
                     hideLoader()
                     hideLoadMore()
+
                     searchUsersResponse.message?.let {
                         Log.d(TAG, it)
                     }
