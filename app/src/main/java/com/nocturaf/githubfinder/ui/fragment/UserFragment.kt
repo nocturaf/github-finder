@@ -101,6 +101,8 @@ class UserFragment : Fragment(LAYOUT) {
             searchView.setOnCloseListener {
                 // reset state
                 searchView.clearFocus()
+                currentPage = 1
+                isOnSearchMode = false
                 loadUsersData()
                 false
             }
